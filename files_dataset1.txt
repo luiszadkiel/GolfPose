@@ -1,0 +1,23 @@
+﻿Next Page Token = CfDJ8E2Nv-_xTuFMnx6IZ-XCV9wA4-jczVmeN_730zLje5lRz2wZYqLJ61Nv2Mry9BJPcrLy8obpG5-D7mn27FV_yjcCt6RuCLIPwOQxZGWqQm9Uf8q7JH-U2QT4iJICgip2um7nDtpad9V-IOAL7NIr2rweLfYzSS8-kZxZhrSGNv82HuVmS2hn_LX2kM833wt-ZxcTv-oODziW
+name                                                                  size  creationDate                
+----------------------------------------------------------------  --------  --------------------------  
+golfswing/coco/hscc_golf_2cls_2d_test.json                         3127698  2026-02-20 15:21:30.687000  
+golfswing/coco/hscc_golf_2cls_2d_train.json                       10941017  2026-02-20 15:21:30.893000  
+golfswing/coco/hscc_golf_3cls_2d_test.json                         4967804  2026-02-20 15:21:30.754000  
+golfswing/coco/hscc_golf_3cls_2d_train.json                       17368336  2026-02-20 15:21:30.974000  
+golfswing/coco/hscc_golf_club_2d_test.json                         1590198  2026-02-20 15:21:30.687000  
+golfswing/coco/hscc_golf_club_2d_train.json                        5569907  2026-02-20 15:21:30.786000  
+golfswing/coco/hscc_golf_kps22_2d_test.json                        2474995  2026-02-20 15:21:30.687000  
+golfswing/coco/hscc_golf_kps22_2d_train.json                       8645831  2026-02-20 15:21:30.766000  
+golfswing/coco/hscc_golf_person_2d_test.json                       2222833  2026-02-20 15:21:30.706000  
+golfswing/coco/hscc_golf_person_2d_train.json                      7766108  2026-02-20 15:21:30.743000  
+golfswing/data_2d_golf_gt.npz                                     10990690  2026-02-20 15:21:30.959000  
+golfswing/data_3d_golf_gt.npz                                      8800274  2026-02-20 15:21:30.821000  
+golfswing/images/S1/S1_Swing.2120309/S1_Swing.2120309_000001.jpg    175843  2026-02-20 15:20:40.113000  
+golfswing/images/S1/S1_Swing.2120309/S1_Swing.2120309_000002.jpg    177983  2026-02-20 15:20:37.671000  
+golfswing/images/S1/S1_Swing.2120309/S1_Swing.2120309_000003.jpg    177760  2026-02-20 15:20:39.835000  
+golfswing/images/S1/S1_Swing.2120309/S1_Swing.2120309_000004.jpg    177715  2026-02-20 15:20:37.788000  
+golfswing/images/S1/S1_Swing.2120309/S1_Swing.2120309_000005.jpg    178073  2026-02-20 15:20:37.957000  
+golfswing/images/S1/S1_Swing.2120309/S1_Swing.2120309_000006.jpg    178012  2026-02-20 15:20:39.764000  
+golfswing/images/S1/S1_Swing.2120309/S1_Swing.2120309_000007.jpg    178075  2026-02-20 15:20:38.761000  
+golfswing/images/S1/S1_Swing.2120309/S1_Swing.2120309_000008.jpg    177592  2026-02-20 15:20:39.587000  

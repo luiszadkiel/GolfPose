@@ -1,0 +1,12 @@
+__pycache__
+*.pyc
+.git
+*.bat
+borrar.py
+common/__pycache__
+web_app/uploads/*
+web_app/results/*
+entrenamiento_kaggle/work_dirs/*/20*
+files_dataset1.txt
+mis_datasets.txt
+mis_kernels.txt

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GolfPose AI | Análisis Pro</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+</head>
+<body>
+    <div class="bg-glow"></div>
+    
+    <nav>
+        <div class="logo">
+            <i class="fas fa-golf-ball-tee"></i>
+            <span>GOLF<strong>POSE</strong> AI</span>
+        </div>
+        <div class="nav-links">
+            <button class="active" onclick="switchMode('upload')"><i class="fas fa-file-upload"></i> Subir Video</button>
+            <button onclick="switchMode('live')"><i class="fas fa-video"></i> En Vivo</button>
+        </div>
+    </nav>
+
+    <main id="upload-mode">
+        <section class="hero">
+            <h1>Analiza tu Swing con <span>Inteligencia Artificial</span></h1>
+            <p>Precisión profesional de 3D Pose directamente en tu navegador.</p>
+        </section>
+
+        <section class="drop-zone" id="drop-zone">
+            <div class="drop-content">
+                <i class="fas fa-cloud-arrow-up"></i>
+                <h3>Arrastra tu video aquí</h3>
+                <p>O haz clic para seleccionar (MP4, MOV)</p>
+                <input type="file" id="file-input" hidden accept="video/*">
+            </div>
+            <div id="processing-view" class="hidden">
+                <div class="loader"></div>
+                <p>Extrayendo keypoints 3D...</p>
+                <div class="progress-bar"><div class="progress" id="progress"></div></div>
+            </div>
+        </section>
+
+        <section id="results-view" class="hidden">
+            <div class="results-grid">
+                <div class="card video-card">
+                    <h3>Análisis de Movimiento</h3>
+                    <div class="video-container">
+                        <video id="output-video" controls></video>
+                    </div>
+                </div>
+                <div class="card stats-card">
+                    <h3>Métricas Biomecánicas</h3>
+                    <div class="stats-list">
+                        <div class="stat-item">
+                            <span>Ángulo de Hombro</span>
+                            <span class="value" id="shoulder-angle">--°</span>
+                        </div>
+                        <div class="stat-item">
+                            <span>Flexión de Rodilla</span>
+                            <span class="value" id="knee-angle">--°</span>
+                        </div>
+                        <div class="stat-item">
+                            <span>Velocidad del Palo</span>
+                            <span class="value" id="club-speed">-- mph</span>
+                        </div>
+                    </div>
+                    <button class="btn-download"><i class="fas fa-file-pdf"></i> Descargar Reporte</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <main id="live-mode" class="hidden">
+        <div class="live-container">
+            <div class="camera-card card">
+                <div class="live-indicator">● LIVE</div>
+                <video id="webcam" autoplay playsinline></video>
+                <canvas id="canvas-overlay"></canvas>
+            </div>
+            <div class="live-sidebar">
+                <div class="card">
+                    <h3>Análisis en Tiempo Real</h3>
+                    <div class="mode-badge" id="mode-badge">2D</div>
+                    <div class="buffer-bar">
+                        <label>Buffer 3D: <span id="buffer-count">0</span>/27</label>
+                        <div class="meter"><div class="fill" id="buffer-fill" style="width: 0%"></div></div>
+                    </div>
+                    <div class="stats-list compact" id="live-stats">
+                        <div class="stat-item"><span>Rodilla Der.</span><span class="value" id="s-rknee">--°</span></div>
+                        <div class="stat-item"><span>Rodilla Izq.</span><span class="value" id="s-lknee">--°</span></div>
+                        <div class="stat-item"><span>Hombro Der.</span><span class="value" id="s-rshoulder">--°</span></div>
+                        <div class="stat-item"><span>Hombro Izq.</span><span class="value" id="s-lshoulder">--°</span></div>
+                        <div class="stat-item"><span>Codo Der.</span><span class="value" id="s-relbow">--°</span></div>
+                        <div class="stat-item"><span>Codo Izq.</span><span class="value" id="s-lelbow">--°</span></div>
+                        <div class="stat-item"><span>Columna</span><span class="value" id="s-spine">--°</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

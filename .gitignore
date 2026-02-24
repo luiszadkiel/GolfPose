@@ -1,0 +1,25 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# Web app data
+web_app/uploads/
+web_app/results/
+
+# Binaries and large files
+ffmpeg.exe
+*.mp4
+*.avi
+*.mov
+
+# ML Models (checkpoints)
+*.pth
+*.bin
+*.pkl
+work_dirs/
+entrenamiento_kaggle/work_dirs/
+
+# Local environments
+venv/
+.env
+.ipynb_checkpoints/
