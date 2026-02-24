@@ -148,6 +148,16 @@ const KP_COLORS = [
 
 async function startLive() {
     const webcam = document.getElementById('webcam');
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert(
+            'La cámara no está disponible.\n\n' +
+            'El navegador requiere HTTPS para acceder a la cámara.\n' +
+            'Accede usando https:// o desde localhost.'
+        );
+        return;
+    }
+
     try {
         liveStream = await navigator.mediaDevices.getUserMedia({
             video: { width: 1280, height: 720 }
@@ -307,5 +317,63 @@ function updateLiveStats(stats) {
     for (const [id, val] of Object.entries(map)) {
         const el = document.getElementById(id);
         if (el && val !== undefined) el.textContent = val + '°';
+    }
+
+    const clubEl = document.getElementById('s-clubspeed');
+    if (clubEl && stats.club_speed != null) clubEl.textContent = stats.club_speed + ' mph';
+
+    updateSwingState(stats);
+}
+
+function updateSwingState(stats) {
+    const dot = document.getElementById('swing-dot');
+    const text = document.getElementById('swing-text');
+    const result = document.getElementById('swing-result');
+    if (!dot || !text) return;
+
+    const st = stats.swing_state;
+    if (st === 'idle') {
+        dot.className = 'swing-dot idle';
+        text.textContent = 'Colócate en posición de address';
+    } else if (st === 'ready') {
+        dot.className = 'swing-dot ready';
+        text.textContent = 'Listo — Haz tu swing';
+        if (result) result.classList.add('hidden');
+    } else if (st === 'active') {
+        dot.className = 'swing-dot active';
+        text.textContent = 'Analizando swing...';
+    } else if (st === 'done') {
+        dot.className = 'swing-dot done';
+        text.textContent = 'Swing completado';
+        if (stats.swing_summary) showSwingSummary(stats.swing_summary);
+    }
+}
+
+function showSwingSummary(s) {
+    const el = document.getElementById('swing-result');
+    if (!el) return;
+    el.classList.remove('hidden');
+
+    const spd = s.peak_club_speed;
+    document.getElementById('sr-speed').textContent = spd ? spd + ' mph' : '-- mph';
+
+    const phases = { a: 'address', i: 'impact', f: 'finish' };
+    const metrics = {
+        rk: 'right_knee_angle', lk: 'left_knee_angle',
+        rs: 'right_shoulder_angle', ls: 'left_shoulder_angle',
+        re: 'right_elbow_angle', le: 'left_elbow_angle',
+        sp: 'spine_angle',
+    };
+
+    for (const [pk, pn] of Object.entries(phases)) {
+        const phase = s[pn];
+        if (!phase) continue;
+        for (const [mk, mn] of Object.entries(metrics)) {
+            const cell = document.getElementById('sr-' + pk + '-' + mk);
+            if (cell) {
+                const v = phase[mn];
+                cell.textContent = v != null ? v + '°' : '--';
+            }
+        }
     }
 }

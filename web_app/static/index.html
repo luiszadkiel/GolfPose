@@ -82,6 +82,10 @@
             <div class="live-sidebar">
                 <div class="card">
                     <h3>Análisis en Tiempo Real</h3>
+                    <div class="swing-status" id="swing-status">
+                        <span class="swing-dot idle" id="swing-dot"></span>
+                        <span id="swing-text">Esperando detección...</span>
+                    </div>
                     <div class="mode-badge" id="mode-badge">2D</div>
                     <div class="buffer-bar">
                         <label>Buffer 3D: <span id="buffer-count">0</span>/27</label>
@@ -95,7 +99,29 @@
                         <div class="stat-item"><span>Codo Der.</span><span class="value" id="s-relbow">--°</span></div>
                         <div class="stat-item"><span>Codo Izq.</span><span class="value" id="s-lelbow">--°</span></div>
                         <div class="stat-item"><span>Columna</span><span class="value" id="s-spine">--°</span></div>
+                        <div class="stat-item"><span>Vel. Palo</span><span class="value" id="s-clubspeed">-- mph</span></div>
                     </div>
+                </div>
+                <div class="card swing-result hidden" id="swing-result">
+                    <h3>⛳ Resultado del Swing</h3>
+                    <div class="swing-speed">
+                        <span>Vel. Pico del Palo</span>
+                        <span class="value" id="sr-speed">-- mph</span>
+                    </div>
+                    <table class="swing-table">
+                        <thead>
+                            <tr><th></th><th>Address</th><th>Impacto</th><th>Finish</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Rod. Der.</td><td id="sr-a-rk">--</td><td id="sr-i-rk">--</td><td id="sr-f-rk">--</td></tr>
+                            <tr><td>Rod. Izq.</td><td id="sr-a-lk">--</td><td id="sr-i-lk">--</td><td id="sr-f-lk">--</td></tr>
+                            <tr><td>Hom. Der.</td><td id="sr-a-rs">--</td><td id="sr-i-rs">--</td><td id="sr-f-rs">--</td></tr>
+                            <tr><td>Hom. Izq.</td><td id="sr-a-ls">--</td><td id="sr-i-ls">--</td><td id="sr-f-ls">--</td></tr>
+                            <tr><td>Codo Der.</td><td id="sr-a-re">--</td><td id="sr-i-re">--</td><td id="sr-f-re">--</td></tr>
+                            <tr><td>Codo Izq.</td><td id="sr-a-le">--</td><td id="sr-i-le">--</td><td id="sr-f-le">--</td></tr>
+                            <tr><td>Columna</td><td id="sr-a-sp">--</td><td id="sr-i-sp">--</td><td id="sr-f-sp">--</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

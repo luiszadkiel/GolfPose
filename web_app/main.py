@@ -83,6 +83,9 @@ async def analyze_video(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
 
     engine.kps_buffer = []
+    engine.prev_kps_2d = None
+    engine.prev_kps_3d = None
+    engine.prev_time = None
 
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
@@ -96,16 +99,19 @@ async def analyze_video(file: UploadFile = File(...)):
     writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
 
     all_stats = []
+    peak_club_speed = 0
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        kps_2d, kp_scores, stats = engine.process_frame(frame)
+        kps_2d, kp_scores, stats = engine.process_frame(frame, fps=fps)
         if kps_2d is not None:
             draw_skeleton_cv(frame, kps_2d, kp_scores)
             all_stats.append(stats)
+            if stats.get("club_speed") is not None:
+                peak_club_speed = max(peak_club_speed, stats["club_speed"])
 
         writer.write(frame)
 
@@ -119,7 +125,7 @@ async def analyze_video(file: UploadFile = File(...)):
         final_stats = {
             "shoulder_angle": last.get("right_shoulder_angle", 0),
             "knee_angle": last.get("right_knee_angle", 0),
-            "club_speed": "--",
+            "club_speed": peak_club_speed if peak_club_speed > 0 else "--",
             "right_knee_angle": last.get("right_knee_angle", 0),
             "left_knee_angle": last.get("left_knee_angle", 0),
             "right_shoulder_angle": last.get("right_shoulder_angle", 0),

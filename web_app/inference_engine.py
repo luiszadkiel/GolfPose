@@ -4,6 +4,7 @@ import cv2
 import os
 import sys
 import pickle
+import time
 
 # Asegurar que el directorio raíz esté en el path para importar 'common'
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -29,6 +30,15 @@ class GolfInferenceEngine:
         self.error = ERROR_ML
         self.kps_buffer = []
         self.last_kps_3d = None
+        self.prev_kps_2d = None
+        self.prev_kps_3d = None
+        self.prev_time = None
+
+        self.swing_state = "idle"
+        self.swing_frames = []
+        self.swing_summary = None
+        self.still_count = 0
+        self.cool_count = 0
 
         if self.error:
             print(f"⚠️ Error cargando librerías ML: {self.error}")
@@ -97,7 +107,7 @@ class GolfInferenceEngine:
             self.error = f"Error cargando checkpoints: {str(e)}"
             print(f"❌ {self.error}")
 
-    def process_frame(self, img):
+    def process_frame(self, img, fps=None):
         if not self.ready:
             return None, None, {"error": self.error or "Motores no listos"}
 
@@ -151,9 +161,27 @@ class GolfInferenceEngine:
         if buffer_count >= self.NUM_FRAMES:
             kps_3d = self.lift_to_3d()
 
-        stats = self._compute_stats(keypoints, kps_3d)
+        now = time.time()
+        if fps is not None:
+            effective_fps = fps
+        elif self.prev_time is not None:
+            effective_fps = 1.0 / max(now - self.prev_time, 0.001)
+        else:
+            effective_fps = 30.0
+
+        stats = self._compute_stats(keypoints, kps_3d, effective_fps)
         stats["buffer"] = buffer_count
         stats["buffer_ready"] = buffer_count >= self.NUM_FRAMES
+
+        club_prop = self._get_club_proportional_speed(keypoints, kps_3d)
+        self._update_swing_state(club_prop, stats)
+        stats["swing_state"] = self.swing_state
+        if self.swing_state == "done" and self.swing_summary is not None:
+            stats["swing_summary"] = self.swing_summary
+
+        self.prev_kps_2d = keypoints.copy()
+        self.prev_kps_3d = kps_3d.copy() if kps_3d is not None else None
+        self.prev_time = now
 
         return keypoints.tolist(), kp_scores.tolist(), stats
 
@@ -175,7 +203,9 @@ class GolfInferenceEngine:
         self.last_kps_3d = kps_3d
         return kps_3d
 
-    def _compute_stats(self, kps_2d, kps_3d):
+    REAL_TORSO_M = 0.50
+
+    def _compute_stats(self, kps_2d, kps_3d, fps=30.0):
         stats = {}
 
         kps = kps_3d if kps_3d is not None else kps_2d
@@ -193,19 +223,147 @@ class GolfInferenceEngine:
             cos = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc) + 1e-8)
             return float(np.degrees(np.arccos(np.clip(cos, -1, 1))))
 
-        # Ángulo de rodilla derecha: hip(1) - knee(2) - foot(3)
         stats["right_knee_angle"] = round(angle_3pts(kps[1], kps[2], kps[3]), 1)
-        # Ángulo de rodilla izquierda: hip(4) - knee(5) - foot(6)
         stats["left_knee_angle"] = round(angle_3pts(kps[4], kps[5], kps[6]), 1)
-        # Ángulo hombro derecho: neck(9) - shoulder(14) - elbow(15)
         stats["right_shoulder_angle"] = round(angle_3pts(kps[9], kps[14], kps[15]), 1)
-        # Ángulo hombro izquierdo: neck(9) - shoulder(11) - elbow(12)
         stats["left_shoulder_angle"] = round(angle_3pts(kps[9], kps[11], kps[12]), 1)
-        # Ángulo codo derecho: shoulder(14) - elbow(15) - wrist(16)
         stats["right_elbow_angle"] = round(angle_3pts(kps[14], kps[15], kps[16]), 1)
-        # Ángulo codo izquierdo: shoulder(11) - elbow(12) - wrist(13)
         stats["left_elbow_angle"] = round(angle_3pts(kps[11], kps[12], kps[13]), 1)
-        # Inclinación de columna: root(0) - spine(7) - thorax(8)
         stats["spine_angle"] = round(angle_3pts(kps[0], kps[7], kps[8]), 1)
 
+        stats["club_speed"] = self._compute_club_speed(kps_2d, kps_3d, fps)
+
+        club_str = f"{stats['club_speed']} mph" if stats['club_speed'] is not None else "--"
+        print(
+            f"📊 [{stats['mode']}] "
+            f"Rod.D={stats['right_knee_angle']}° Rod.I={stats['left_knee_angle']}° | "
+            f"Hom.D={stats['right_shoulder_angle']}° Hom.I={stats['left_shoulder_angle']}° | "
+            f"Cod.D={stats['right_elbow_angle']}° Cod.I={stats['left_elbow_angle']}° | "
+            f"Col={stats['spine_angle']}° | Vel.Palo={club_str}"
+        )
+
         return stats
+
+    def _compute_club_speed(self, kps_2d, kps_3d, fps):
+        HOSEL_IDX = 18
+
+        if kps_3d is not None and self.prev_kps_3d is not None:
+            kps_now = np.array(kps_3d)
+            kps_prev = np.array(self.prev_kps_3d)
+        elif self.prev_kps_2d is not None:
+            kps_now = np.array(kps_2d)
+            kps_prev = np.array(self.prev_kps_2d)
+        else:
+            return None
+
+        club_disp = np.linalg.norm(kps_now[HOSEL_IDX] - kps_prev[HOSEL_IDX])
+
+        torso_len = np.linalg.norm(kps_now[9] - kps_now[0])
+        if torso_len < 1e-6:
+            return None
+
+        disp_m = club_disp * (self.REAL_TORSO_M / torso_len)
+        speed_mph = disp_m * fps * 2.23694
+
+        return round(speed_mph, 1)
+
+    # --- Swing detection ---
+
+    STILL_THRESH = 0.03
+    SWING_THRESH = 0.08
+    STILL_FRAMES_NEEDED = 6
+    COOL_FRAMES_NEEDED = 4
+    DONE_HOLD_FRAMES = 12
+
+    def _get_club_proportional_speed(self, kps_2d, kps_3d):
+        HOSEL_IDX = 18
+        if kps_3d is not None and self.prev_kps_3d is not None:
+            kps_now, kps_prev = np.array(kps_3d), np.array(self.prev_kps_3d)
+        elif self.prev_kps_2d is not None:
+            kps_now, kps_prev = np.array(kps_2d), np.array(self.prev_kps_2d)
+        else:
+            return 0.0
+        club_disp = np.linalg.norm(kps_now[HOSEL_IDX] - kps_prev[HOSEL_IDX])
+        torso_len = np.linalg.norm(kps_now[9] - kps_now[0])
+        if torso_len < 1e-6:
+            return 0.0
+        return club_disp / torso_len
+
+    def _update_swing_state(self, club_prop, stats):
+        if self.swing_state == "idle":
+            if club_prop < self.STILL_THRESH:
+                self.still_count += 1
+                if self.still_count >= self.STILL_FRAMES_NEEDED:
+                    self.swing_state = "ready"
+                    self.swing_summary = None
+                    print("🏌️ Address detectado — Listo para swing")
+            else:
+                self.still_count = 0
+
+        elif self.swing_state == "ready":
+            if club_prop >= self.SWING_THRESH:
+                self.swing_state = "active"
+                self.swing_frames = [stats.copy()]
+                self.cool_count = 0
+                print("🔴 Swing iniciado — Grabando...")
+
+        elif self.swing_state == "active":
+            self.swing_frames.append(stats.copy())
+            if club_prop < self.STILL_THRESH:
+                self.cool_count += 1
+                if self.cool_count >= self.COOL_FRAMES_NEEDED:
+                    self._finalize_swing()
+                    self.swing_state = "done"
+                    self.still_count = 0
+            else:
+                self.cool_count = 0
+
+        elif self.swing_state == "done":
+            if club_prop < self.STILL_THRESH:
+                self.still_count += 1
+                if self.still_count >= self.DONE_HOLD_FRAMES:
+                    self.swing_state = "idle"
+                    self.still_count = 0
+            else:
+                self.still_count = 0
+
+    _SWING_KEYS = [
+        "right_knee_angle", "left_knee_angle",
+        "right_shoulder_angle", "left_shoulder_angle",
+        "right_elbow_angle", "left_elbow_angle",
+        "spine_angle",
+    ]
+
+    def _finalize_swing(self):
+        if not self.swing_frames:
+            return
+
+        address = self.swing_frames[0]
+        finish = self.swing_frames[-1]
+
+        peak_speed = 0
+        impact = address
+        for f in self.swing_frames:
+            spd = f.get("club_speed")
+            if spd is not None and spd > peak_speed:
+                peak_speed = spd
+                impact = f
+
+        extract = lambda fr: {k: fr.get(k) for k in self._SWING_KEYS}
+
+        self.swing_summary = {
+            "peak_club_speed": peak_speed if peak_speed > 0 else None,
+            "total_frames": len(self.swing_frames),
+            "address": extract(address),
+            "impact": extract(impact),
+            "finish": extract(finish),
+        }
+
+        spd_str = f"{peak_speed} mph" if peak_speed > 0 else "--"
+        print("=" * 60)
+        print(f"⛳ SWING COMPLETO — {len(self.swing_frames)} frames")
+        print(f"   💨 Vel. Pico Palo: {spd_str}")
+        print(f"   📍 Address → Rod.D={address.get('right_knee_angle')}° Hom.D={address.get('right_shoulder_angle')}° Col={address.get('spine_angle')}°")
+        print(f"   💥 Impacto → Rod.D={impact.get('right_knee_angle')}° Hom.D={impact.get('right_shoulder_angle')}° Col={impact.get('spine_angle')}°")
+        print(f"   🏁 Finish  → Rod.D={finish.get('right_knee_angle')}° Hom.D={finish.get('right_shoulder_angle')}° Col={finish.get('spine_angle')}°")
+        print("=" * 60)

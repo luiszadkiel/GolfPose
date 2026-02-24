@@ -362,3 +362,84 @@ video#output-video {
 .stats-list.compact {
     gap: 0.4rem;
 }
+
+/* --- Swing detection --- */
+
+.swing-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    font-size: 0.9rem;
+}
+
+.swing-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.swing-dot.idle   { background: #6b7280; }
+.swing-dot.ready  { background: #22c55e; animation: pulse 1s infinite; }
+.swing-dot.active { background: #ef4444; animation: pulse 0.4s infinite; }
+.swing-dot.done   { background: #3b82f6; }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.3; }
+}
+
+.swing-result {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.swing-speed {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    font-size: 0.95rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 10px;
+}
+.swing-speed .value {
+    font-weight: 800;
+    font-size: 1.2rem;
+    color: var(--primary);
+}
+
+.swing-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+.swing-table th,
+.swing-table td {
+    padding: 5px 6px;
+    text-align: center;
+}
+.swing-table thead th {
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 8px;
+}
+.swing-table td:first-child {
+    text-align: left;
+    color: var(--text-dim);
+    font-weight: 500;
+}
+.swing-table td {
+    color: #e5e7eb;
+}
