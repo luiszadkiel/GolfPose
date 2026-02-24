@@ -25,8 +25,9 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 # Copiar el código de la app
 COPY common/ common/
 COPY configs/ configs/
-# Solo copiamos lo necesario de work_dirs para ahorrar espacio
-COPY entrenamiento_kaggle/work_dirs/ entrenamiento_kaggle/work_dirs/
+# Intentar copiar modelos si existen (en locales con espacio), si no, crear carpetas vacías
+# Usamos un wildcard para que si no hay nada no falle el build en GitHub Actions
+COPY entrenamiento_kaggle/work_dirs* entrenamiento_kaggle/work_dirs/
 COPY web_app/ web_app/
 
 RUN mkdir -p web_app/uploads web_app/results
