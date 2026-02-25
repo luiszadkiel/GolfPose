@@ -28,9 +28,10 @@ jobs:
       - name: Download Models from S3
         run: |
           mkdir -p entrenamiento_kaggle/work_dirs
-          aws s3 cp s3://modelo-entrenado-kaggel--use1-az4--x-s3/work_dirs/ entrenamiento_kaggle/work_dirs/ --recursive
-          echo "Contenido descargado:"
-          ls -R entrenamiento_kaggle/
+          aws s3 sync s3://modelo-entrenado-kaggel--use1-az4--x-s3/work_dirs/ entrenamiento_kaggle/work_dirs/
+          echo "Verificación de archivos y tamaños:"
+          du -sh entrenamiento_kaggle/work_dirs/*
+          ls -R entrenamiento_kaggle/work_dirs/
 
       - name: Build, tag, and push image to Amazon ECR
         env:
