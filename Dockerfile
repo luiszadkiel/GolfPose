@@ -39,8 +39,10 @@ COPY common/ common/
 COPY configs/ configs/
 COPY web_app/ web_app/
 
-# TRUCO: Copiar modelos si existen
-COPY requirements.txt entrenamiento_kaggle/work_dirs* entrenamiento_kaggle/work_dirs/
+# Copiamos la carpeta de modelos completa. 
+# En GitHub Actions esto tendrá los archivos de S3.
+# En local, si no la tienes, no fallará por el .dockerignore o carpeta vacía.
+COPY entrenamiento_kaggle/ entrenamiento_kaggle/
 
 EXPOSE 8000
 
