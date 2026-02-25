@@ -61,9 +61,28 @@ class GolfInferenceEngine:
                 with open(last_cp_path, 'r') as f:
                     content = f.read().strip()
                     if content:
-                        # Extraer el nombre del archivo (ej. epoch_30.pth) de la ruta de Kaggle
-                        self.det_checkpoint = os.path.join(det_dir, os.path.basename(content))
-                        print(f"🔍 Checkpoint del detector detectado dinámicamente: {self.det_checkpoint}")
+                        checkpoint_name = os.path.basename(content)
+                        potential_path = os.path.join(det_dir, checkpoint_name)
+                        
+                        if os.path.exists(potential_path):
+                            self.det_checkpoint = potential_path
+                        else:
+                            # Búsqueda recursiva por si está dentro de una carpeta de fecha
+                            print(f"⚠️ {checkpoint_name} no está en la raíz, buscando en subdirectorios...")
+                            found = False
+                            for root, dirs, files in os.walk(det_dir):
+                                if checkpoint_name in files:
+                                    self.det_checkpoint = os.path.join(root, checkpoint_name)
+                                    found = True
+                                    break
+                            
+                            if found:
+                                print(f"✨ Encontrado en: {self.det_checkpoint}")
+                            else:
+                                print(f"❌ No se encontró {checkpoint_name} en ninguna parte de {det_dir}")
+                                self.det_checkpoint = os.path.join(det_dir, 'best_coco_bbox_mAP_epoch_22.pth')
+                        
+                        print(f"🔍 Checkpoint final seleccionado: {self.det_checkpoint}")
                     else:
                         raise ValueError("last_checkpoint está vacío")
             except Exception as e:
