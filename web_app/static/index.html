@@ -81,10 +81,10 @@
             </div>
             <div class="live-sidebar">
                 <div class="card">
-                    <h3>Análisis en Tiempo Real</h3>
+                    <h3>Análisis en Vivo</h3>
                     <div class="swing-status" id="swing-status">
                         <span class="swing-dot idle" id="swing-dot"></span>
-                        <span id="swing-text">Esperando detección...</span>
+                        <span id="swing-text">Ponte de pie con el palo y quédate quieto</span>
                     </div>
                     <div class="mode-badge" id="mode-badge">2D</div>
                     <div class="buffer-bar">
@@ -110,7 +110,7 @@
                     </div>
                     <table class="swing-table">
                         <thead>
-                            <tr><th></th><th>Address</th><th>Impacto</th><th>Finish</th></tr>
+                            <tr><th></th><th>Inicio</th><th>Impacto</th><th>Final</th></tr>
                         </thead>
                         <tbody>
                             <tr><td>Rod. Der.</td><td id="sr-a-rk">--</td><td id="sr-i-rk">--</td><td id="sr-f-rk">--</td></tr>
@@ -122,8 +122,28 @@
                             <tr><td>Columna</td><td id="sr-a-sp">--</td><td id="sr-i-sp">--</td><td id="sr-f-sp">--</td></tr>
                         </tbody>
                     </table>
+                    <div class="verdict-box" id="verdict-box">
+                        <div class="verdict-header">
+                            <span class="verdict-badge" id="verdict-badge">--</span>
+                            <span class="verdict-score">Score: <strong id="verdict-score">--</strong>%</span>
+                        </div>
+                        <ul class="verdict-problems" id="verdict-problems"></ul>
+                    </div>
                 </div>
             </div>
+        </div>
+        <div class="instructions-bar">
+            <div class="step" id="flow-1"><span class="step-num">1</span> Quieto 3s</div>
+            <div class="step-arrow">→</div>
+            <div class="step" id="flow-2"><span class="step-num">2</span> Punto VERDE</div>
+            <div class="step-arrow">→</div>
+            <div class="step" id="flow-3"><span class="step-num">3</span> Haz tu Swing</div>
+            <div class="step-arrow">→</div>
+            <div class="step" id="flow-4"><span class="step-num">4</span> Quieto 1s</div>
+            <div class="step-arrow">→</div>
+            <div class="step" id="flow-5"><span class="step-num">5</span> RESULTADO</div>
+            <div class="step-arrow">→</div>
+            <div class="step" id="flow-6"><span class="step-num">6</span> Repite</div>
         </div>
     </main>
 

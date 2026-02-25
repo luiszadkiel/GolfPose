@@ -33,6 +33,8 @@ class GolfInferenceEngine:
         self.prev_kps_2d = None
         self.prev_kps_3d = None
         self.prev_time = None
+        self.last_3d_time = 0
+        self.MIN_3D_INTERVAL = 0.5 if self.device == 'cuda' else 2.0
 
         self.swing_state = "idle"
         self.swing_frames = []
@@ -49,8 +51,27 @@ class GolfInferenceEngine:
             print(f"   GPU: {torch.cuda.get_device_name(0)}")
             print(f"   VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
 
-        self.det_config = 'entrenamiento_kaggle/work_dirs/detector_yolox_2cls/golfpose_detector_2cls_yolox_s.py'
-        self.det_checkpoint = 'entrenamiento_kaggle/work_dirs/detector_yolox_2cls/best_coco_bbox_mAP_epoch_22.pth'
+        det_dir = 'entrenamiento_kaggle/work_dirs/detector_yolox_2cls'
+        self.det_config = os.path.join(det_dir, 'golfpose_detector_2cls_yolox_s.py')
+        
+        # Intentar determinar el checkpoint dinámicamente desde 'last_checkpoint'
+        last_cp_path = os.path.join(det_dir, 'last_checkpoint')
+        if os.path.exists(last_cp_path):
+            try:
+                with open(last_cp_path, 'r') as f:
+                    content = f.read().strip()
+                    if content:
+                        # Extraer el nombre del archivo (ej. epoch_30.pth) de la ruta de Kaggle
+                        self.det_checkpoint = os.path.join(det_dir, os.path.basename(content))
+                        print(f"🔍 Checkpoint del detector detectado dinámicamente: {self.det_checkpoint}")
+                    else:
+                        raise ValueError("last_checkpoint está vacío")
+            except Exception as e:
+                print(f"⚠️ No se pudo leer last_checkpoint, usando valor por defecto: {e}")
+                self.det_checkpoint = os.path.join(det_dir, 'best_coco_bbox_mAP_epoch_22.pth')
+        else:
+            self.det_checkpoint = os.path.join(det_dir, 'best_coco_bbox_mAP_epoch_22.pth')
+
         self.pose2d_config = 'configs/mmpose/golfpose_golfer_hrnetw48.py'
         self.pose2d_checkpoint = 'entrenamiento_kaggle/work_dirs/pose2d_hrnet/pose2d_best.pth'
         self.pose3d_checkpoint = 'entrenamiento_kaggle/work_dirs/pose3d_golfpose/pose3d_epoch80.bin'
@@ -158,10 +179,15 @@ class GolfInferenceEngine:
         kps_3d = None
         buffer_count = len(self.kps_buffer)
 
-        if buffer_count >= self.NUM_FRAMES:
-            kps_3d = self.lift_to_3d()
-
         now = time.time()
+        if buffer_count >= self.NUM_FRAMES:
+            if fps is not None:
+                kps_3d = self.lift_to_3d()
+            elif now - self.last_3d_time >= self.MIN_3D_INTERVAL:
+                kps_3d = self.lift_to_3d()
+                self.last_3d_time = now
+            else:
+                kps_3d = self.last_kps_3d
         if fps is not None:
             effective_fps = fps
         elif self.prev_time is not None:
@@ -176,6 +202,7 @@ class GolfInferenceEngine:
         club_prop = self._get_club_proportional_speed(keypoints, kps_3d)
         self._update_swing_state(club_prop, stats)
         stats["swing_state"] = self.swing_state
+        print(f"   🎯 mov={club_prop:.3f} estado={self.swing_state} quieto={self.still_count}/{self.STILL_FRAMES_NEEDED}")
         if self.swing_state == "done" and self.swing_summary is not None:
             stats["swing_summary"] = self.swing_summary
 
@@ -269,11 +296,11 @@ class GolfInferenceEngine:
 
     # --- Swing detection ---
 
-    STILL_THRESH = 0.03
-    SWING_THRESH = 0.08
-    STILL_FRAMES_NEEDED = 6
-    COOL_FRAMES_NEEDED = 4
-    DONE_HOLD_FRAMES = 12
+    STILL_THRESH = 0.20
+    SWING_THRESH = 0.50
+    STILL_FRAMES_NEEDED = 3
+    COOL_FRAMES_NEEDED = 3
+    DONE_HOLD_FRAMES = 8
 
     def _get_club_proportional_speed(self, kps_2d, kps_3d):
         HOSEL_IDX = 18
@@ -296,7 +323,7 @@ class GolfInferenceEngine:
                 if self.still_count >= self.STILL_FRAMES_NEEDED:
                     self.swing_state = "ready"
                     self.swing_summary = None
-                    print("🏌️ Address detectado — Listo para swing")
+                    print("🏌️ Posición inicial detectada — Listo para swing")
             else:
                 self.still_count = 0
 
@@ -334,6 +361,28 @@ class GolfInferenceEngine:
         "spine_angle",
     ]
 
+    IDEAL_RANGES = {
+        "right_knee_angle":     {"address": (150, 165), "impact": (140, 155), "finish": (160, 175)},
+        "left_knee_angle":      {"address": (150, 165), "impact": (155, 170), "finish": (170, 180)},
+        "right_shoulder_angle": {"address": (0, 10),    "impact": (30, 45),   "finish": (80, 100)},
+        "left_shoulder_angle":  {"address": (0, 10),    "impact": (30, 45),   "finish": (80, 100)},
+        "right_elbow_angle":    {"address": (150, 170), "impact": (130, 150), "finish": (160, 180)},
+        "left_elbow_angle":     {"address": (150, 170), "impact": (140, 160), "finish": (160, 180)},
+        "spine_angle":          {"address": (30, 40),   "impact": (25, 35),   "finish": (20, 30)},
+    }
+
+    _METRIC_NAMES = {
+        "right_knee_angle": "Rodilla Der.",
+        "left_knee_angle": "Rodilla Izq.",
+        "right_shoulder_angle": "Hombro Der.",
+        "left_shoulder_angle": "Hombro Izq.",
+        "right_elbow_angle": "Codo Der.",
+        "left_elbow_angle": "Codo Izq.",
+        "spine_angle": "Columna",
+    }
+
+    _PHASE_NAMES = {"address": "Inicio", "impact": "Impacto", "finish": "Final"}
+
     def _finalize_swing(self):
         if not self.swing_frames:
             return
@@ -359,11 +408,150 @@ class GolfInferenceEngine:
             "finish": extract(finish),
         }
 
+        self.swing_summary["evaluation"] = self._evaluate_swing(self.swing_summary)
+
         spd_str = f"{peak_speed} mph" if peak_speed > 0 else "--"
+        ev = self.swing_summary["evaluation"]
+        v_icon = {"bueno": "🟢", "aceptable": "🟡", "malo": "🔴"}[ev["verdict"]]
+
         print("=" * 60)
         print(f"⛳ SWING COMPLETO — {len(self.swing_frames)} frames")
         print(f"   💨 Vel. Pico Palo: {spd_str}")
-        print(f"   📍 Address → Rod.D={address.get('right_knee_angle')}° Hom.D={address.get('right_shoulder_angle')}° Col={address.get('spine_angle')}°")
+        print(f"   📍 Inicio  → Rod.D={address.get('right_knee_angle')}° Hom.D={address.get('right_shoulder_angle')}° Col={address.get('spine_angle')}°")
         print(f"   💥 Impacto → Rod.D={impact.get('right_knee_angle')}° Hom.D={impact.get('right_shoulder_angle')}° Col={impact.get('spine_angle')}°")
-        print(f"   🏁 Finish  → Rod.D={finish.get('right_knee_angle')}° Hom.D={finish.get('right_shoulder_angle')}° Col={finish.get('spine_angle')}°")
+        print(f"   🏁 Final   → Rod.D={finish.get('right_knee_angle')}° Hom.D={finish.get('right_shoulder_angle')}° Col={finish.get('spine_angle')}°")
+        print(f"   📈 Score: {ev['score']}% ({ev['in_range']}/{ev['total']} en rango)")
+        print(f"   {v_icon} Veredicto: SWING {ev['verdict'].upper()}")
+        for p in ev["problems"]:
+            print(f"   ⚠️ {p}")
         print("=" * 60)
+
+    _FEEDBACK = {
+        ("right_knee_angle", "address", "low"):  "Flexionaste demasiado la rodilla derecha al inicio — postura inestable",
+        ("right_knee_angle", "address", "high"): "Pierna derecha muy recta al inicio — necesitas más flexión para generar potencia",
+        ("right_knee_angle", "impact", "low"):   "Tu rodilla derecha colapsó en el impacto — pierdes potencia y equilibrio",
+        ("right_knee_angle", "impact", "high"):  "Pierna derecha rígida en el impacto — no transferiste el peso hacia adelante",
+        ("right_knee_angle", "finish", "low"):   "Rodilla derecha muy doblada al final — falta estabilidad en el seguimiento",
+        ("right_knee_angle", "finish", "high"):  "Pierna derecha bloqueada al final — falta fluidez en el finish",
+
+        ("left_knee_angle", "address", "low"):   "Rodilla izquierda muy flexionada al inicio — desbalance en la postura",
+        ("left_knee_angle", "address", "high"):  "Pierna izquierda muy recta al inicio — necesitas más flex de rodilla",
+        ("left_knee_angle", "impact", "low"):    "Tu rodilla izquierda colapsó en el impacto — base inestable, pierdes dirección",
+        ("left_knee_angle", "impact", "high"):   "Pierna izquierda rígida en el impacto — no rotaste la cadera correctamente",
+        ("left_knee_angle", "finish", "low"):    "Rodilla izquierda muy doblada al final — pérdida de balance",
+        ("left_knee_angle", "finish", "high"):   "Pierna izquierda se extendió correctamente pero demasiado recta",
+
+        ("right_shoulder_angle", "address", "high"): "Hombro derecho ya rotado antes de empezar — corrige tu postura inicial",
+        ("right_shoulder_angle", "impact", "low"):   "Poca rotación de hombro derecho en el impacto — swing débil, falta potencia",
+        ("right_shoulder_angle", "impact", "high"):  "Rotaste demasiado el hombro derecho — pierdes control del palo",
+        ("right_shoulder_angle", "finish", "low"):   "El hombro derecho no completó la rotación — swing incompleto",
+        ("right_shoulder_angle", "finish", "high"):  "Sobre-rotación del hombro derecho al final — riesgo de lesión",
+
+        ("left_shoulder_angle", "address", "high"):  "Hombro izquierdo ya rotado al inicio — alinea los hombros con la bola",
+        ("left_shoulder_angle", "impact", "low"):    "Poca rotación de hombro izquierdo en el impacto — falta potencia",
+        ("left_shoulder_angle", "impact", "high"):   "Rotaste demasiado el hombro izquierdo — pierdes precisión",
+        ("left_shoulder_angle", "finish", "low"):    "El hombro izquierdo no completó el giro — finish incompleto",
+        ("left_shoulder_angle", "finish", "high"):   "Sobre-rotación del hombro izquierdo al final — pérdida de control",
+
+        ("right_elbow_angle", "address", "low"):  "Codo derecho muy doblado al inicio — brazos deben estar más extendidos",
+        ("right_elbow_angle", "address", "high"): "Codo derecho bloqueado al inicio — necesitas un poco de flex natural",
+        ("right_elbow_angle", "impact", "low"):   "Codo derecho muy flexionado en el impacto — swing 'quebrado', pierdes alcance",
+        ("right_elbow_angle", "impact", "high"):  "Codo derecho muy rígido en el impacto — falta fluidez, riesgo de slice",
+        ("right_elbow_angle", "finish", "low"):   "Codo derecho muy doblado al final — no completaste la extensión",
+        ("right_elbow_angle", "finish", "high"):  "Codo derecho hiperextendido al final — cuidado con lesiones",
+
+        ("left_elbow_angle", "address", "low"):   "Codo izquierdo muy doblado al inicio — el brazo guía debe estar más recto",
+        ("left_elbow_angle", "address", "high"):  "Codo izquierdo bloqueado al inicio — relaja un poco el brazo",
+        ("left_elbow_angle", "impact", "low"):    "Codo izquierdo se dobló en el impacto — 'chicken wing', pierdes distancia",
+        ("left_elbow_angle", "impact", "high"):   "Codo izquierdo muy rígido en el impacto — falta naturalidad",
+        ("left_elbow_angle", "finish", "low"):    "Codo izquierdo muy doblado al final — el brazo no se extendió bien",
+        ("left_elbow_angle", "finish", "high"):   "Codo izquierdo hiperextendido al final — cuidado con la articulación",
+
+        ("spine_angle", "address", "low"):  "Espalda demasiado inclinada al inicio — riesgo de topping y slices",
+        ("spine_angle", "address", "high"): "Postura muy erguida al inicio — inclínate más desde la cadera",
+        ("spine_angle", "impact", "low"):   "Te inclinaste demasiado en el impacto — pierdes balance y dirección",
+        ("spine_angle", "impact", "high"):  "Te levantaste en el impacto — 'early extension', causa tops y chunks",
+        ("spine_angle", "finish", "low"):   "Espalda muy inclinada al final — posible pérdida de balance",
+        ("spine_angle", "finish", "high"):  "Torso muy erguido al final — falta seguimiento natural del cuerpo",
+    }
+
+    def _evaluate_swing(self, summary):
+        phases = {
+            "address": summary["address"],
+            "impact": summary["impact"],
+            "finish": summary["finish"],
+        }
+
+        total = 0
+        in_range = 0
+        problems = []
+
+        for metric, ranges in self.IDEAL_RANGES.items():
+            for phase, (lo, hi) in ranges.items():
+                val = phases[phase].get(metric)
+                if val is None:
+                    continue
+                total += 1
+                if lo <= val <= hi:
+                    in_range += 1
+                else:
+                    direction = "low" if val < lo else "high"
+                    fb = self._FEEDBACK.get((metric, phase, direction))
+                    if fb:
+                        problems.append(f"{fb} ({val}°, ideal {lo}°–{hi}°)")
+                    else:
+                        name = self._METRIC_NAMES[metric]
+                        pname = self._PHASE_NAMES[phase]
+                        problems.append(f"{name} en {pname}: {val}° (ideal {lo}°–{hi}°)")
+
+        score = round((in_range / total) * 100) if total > 0 else 0
+
+        for metric in self.IDEAL_RANGES:
+            a_val = phases["address"].get(metric)
+            i_val = phases["impact"].get(metric)
+            if a_val is not None and i_val is not None:
+                delta = abs(i_val - a_val)
+                if delta > 40:
+                    name = self._METRIC_NAMES[metric]
+                    problems.append(f"{name}: cambio brusco de {delta:.0f}° entre inicio e impacto — movimiento descontrolado")
+
+        sym_pairs = [
+            ("right_knee_angle", "left_knee_angle", "Rodillas"),
+            ("right_shoulder_angle", "left_shoulder_angle", "Hombros"),
+            ("right_elbow_angle", "left_elbow_angle", "Codos"),
+        ]
+        for r, l, name in sym_pairs:
+            for phase in ["address", "impact", "finish"]:
+                r_val = phases[phase].get(r)
+                l_val = phases[phase].get(l)
+                if r_val is not None and l_val is not None:
+                    diff = abs(r_val - l_val)
+                    if diff > 20:
+                        pname = self._PHASE_NAMES[phase]
+                        problems.append(f"{name} desbalanceadas en {pname}: {diff:.0f}° de diferencia — distribuye mejor el peso")
+
+        has_critical = False
+        for metric in ["spine_angle", "right_knee_angle", "left_knee_angle"]:
+            val = phases["impact"].get(metric)
+            if val is None:
+                continue
+            lo, hi = self.IDEAL_RANGES[metric]["impact"]
+            if val < lo - 15 or val > hi + 15:
+                has_critical = True
+
+        has_collapse = any("descontrolado" in p for p in problems)
+
+        if score >= 80 and not has_critical and not has_collapse:
+            verdict = "bueno"
+        elif score >= 65 and not has_critical:
+            verdict = "aceptable"
+        else:
+            verdict = "malo"
+
+        return {
+            "score": score,
+            "in_range": in_range,
+            "total": total,
+            "verdict": verdict,
+            "problems": problems[:8],
+        }

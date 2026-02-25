@@ -332,20 +332,34 @@ function updateSwingState(stats) {
     if (!dot || !text) return;
 
     const st = stats.swing_state;
+    let activeFlow = 0;
+
     if (st === 'idle') {
         dot.className = 'swing-dot idle';
-        text.textContent = 'Colócate en posición de address';
+        text.textContent = 'Ponte de pie con el palo y quédate quieto';
+        activeFlow = 1;
     } else if (st === 'ready') {
         dot.className = 'swing-dot ready';
-        text.textContent = 'Listo — Haz tu swing';
+        text.textContent = '¡Listo! Haz tu swing cuando quieras';
         if (result) result.classList.add('hidden');
+        activeFlow = 2;
     } else if (st === 'active') {
         dot.className = 'swing-dot active';
-        text.textContent = 'Analizando swing...';
+        text.textContent = 'Grabando swing...';
+        activeFlow = 3;
     } else if (st === 'done') {
         dot.className = 'swing-dot done';
-        text.textContent = 'Swing completado';
+        text.textContent = '¡Swing analizado!';
         if (stats.swing_summary) showSwingSummary(stats.swing_summary);
+        activeFlow = 5;
+    }
+
+    for (let i = 1; i <= 6; i++) {
+        const el = document.getElementById('flow-' + i);
+        if (!el) continue;
+        el.classList.remove('flow-active', 'flow-done');
+        if (i === activeFlow) el.classList.add('flow-active');
+        else if (i < activeFlow) el.classList.add('flow-done');
     }
 }
 
@@ -374,6 +388,31 @@ function showSwingSummary(s) {
                 const v = phase[mn];
                 cell.textContent = v != null ? v + '°' : '--';
             }
+        }
+    }
+
+    if (s.evaluation) {
+        const ev = s.evaluation;
+        const badge = document.getElementById('verdict-badge');
+        const verdictLabels = { bueno: 'SWING BUENO', aceptable: 'SWING ACEPTABLE', malo: 'SWING MALO' };
+        badge.textContent = verdictLabels[ev.verdict] || ev.verdict;
+        badge.className = 'verdict-badge v-' + ev.verdict;
+
+        document.getElementById('verdict-score').textContent = ev.score;
+
+        const list = document.getElementById('verdict-problems');
+        list.innerHTML = '';
+        if (ev.problems && ev.problems.length > 0) {
+            ev.problems.forEach(p => {
+                const li = document.createElement('li');
+                li.textContent = p;
+                list.appendChild(li);
+            });
+        } else {
+            const li = document.createElement('li');
+            li.textContent = 'Todas las métricas dentro del rango ideal';
+            li.className = 'ok';
+            list.appendChild(li);
         }
     }
 }

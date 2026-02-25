@@ -28,10 +28,15 @@ jobs:
       - name: Download Models from S3
         run: |
           mkdir -p entrenamiento_kaggle/work_dirs
-          aws s3 sync s3://modelo-entrenado-kaggel--use1-az4--x-s3/work_dirs/ entrenamiento_kaggle/work_dirs/
-          echo "Verificación de archivos y tamaños:"
-          du -sh entrenamiento_kaggle/work_dirs/*
+          echo "Sincronizando modelos desde S3 Express (excluyendo logs pesados)..."
+          # Sincronizamos solo archivos esenciales, ignorando las carpetas de entrenamiento temporales (que pesan GBs)
+          aws s3 sync s3://golfpose-gpu-kaggel--use1-az4--x-s3/work_dirs/ entrenamiento_kaggle/work_dirs/ \
+            --exclude "*/202*/*" \
+            --delete
+
+          echo "Verificación de archivos descargados:"
           ls -R entrenamiento_kaggle/work_dirs/
+          du -sh entrenamiento_kaggle/work_dirs/*
 
       - name: Build, tag, and push image to Amazon ECR
         env:
