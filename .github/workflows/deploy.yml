@@ -39,8 +39,9 @@ jobs:
             --include "*.py" \
             --include "*last_checkpoint*"
 
-          echo "Verificación de archivos descargados:"
-          find entrenamiento_kaggle/work_dirs/ -maxdepth 3 -not -path '*/.*'
+          echo "Verificación de modelos descargados:"
+          # Lista solo archivos .pth y .bin para verificar los pesos
+          find entrenamiento_kaggle/work_dirs/ -name "*.pth" -o -name "*.bin"
           du -sh entrenamiento_kaggle/work_dirs/*
 
       - name: Build, tag, and push image to Amazon ECR

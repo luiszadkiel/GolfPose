@@ -71,7 +71,7 @@ def reencode_h264(src):
         os.remove(tmp)
     except (FileNotFoundError, subprocess.CalledProcessError):
         os.rename(tmp, src)
-
+ 
 @app.post("/analyze_video")
 async def analyze_video(file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
