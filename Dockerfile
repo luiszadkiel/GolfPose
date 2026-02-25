@@ -15,18 +15,23 @@ RUN ln -sf /usr/bin/python3.10 /usr/bin/python && \
 
 WORKDIR /app
 
-# Crear directorios necesarios para que la app no falle al arrancar
+# Crear directorios necesarios
 RUN mkdir -p entrenamiento_kaggle/work_dirs/detector_yolox_2cls \
     entrenamiento_kaggle/work_dirs/pose2d_hrnet \
     entrenamiento_kaggle/work_dirs/pose3d_golfpose \
     web_app/uploads web_app/results
 
-# Instalar OpenMMLab primero para evitar conflictos de versiones luego
+# 1. Copiar requirements primero
+COPY requirements.txt .
+
+# 2. Instalar PyTorch PRIMERO para que 'mim' pueda detectarlo
+RUN pip install --no-cache-dir torch==2.1.2+cu118 torchvision==0.16.2+cu118 torchaudio==2.1.2+cu118 --extra-index-url https://download.pytorch.org/whl/cu118
+
+# 3. Ahora instalar OpenMMLab con mim (ya encontrará torch disponible)
 RUN pip install --no-cache-dir -U openmim && \
     mim install mmengine==0.10.3 mmcv==2.1.0 mmdet==3.2.0 mmpose==1.3.1
 
-# Instalar el resto de dependencias (esto fijará numpy y otros si mim los cambió)
-COPY requirements.txt .
+# 4. Instalar el resto de dependencias
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar el código de la app
@@ -34,9 +39,7 @@ COPY common/ common/
 COPY configs/ configs/
 COPY web_app/ web_app/
 
-# TRUCO: Copiar modelos solo si existen. 
-# Como requirements.txt siempre existe, este comando no fallará en GitHub Actions
-# aunque la carpeta work_dirs no esté en Git.
+# TRUCO: Copiar modelos si existen
 COPY requirements.txt entrenamiento_kaggle/work_dirs* entrenamiento_kaggle/work_dirs/
 
 EXPOSE 8000
