@@ -41,6 +41,8 @@ class GolfInferenceEngine:
         self.swing_summary = None
         self.still_count = 0
         self.cool_count = 0
+        self._still_start = None
+        self._done_time = 0
 
         if self.error:
             print(f"⚠️ Error cargando librerías ML: {self.error}")
@@ -315,20 +317,20 @@ class GolfInferenceEngine:
 
     # --- Swing detection ---
 
-    STILL_THRESH = 0.20
-    SWING_THRESH = 0.50
+    STILL_THRESH = 0.15
+    SWING_THRESH = 0.40
     STILL_FRAMES_NEEDED = 3
     COOL_FRAMES_NEEDED = 3
-    DONE_HOLD_FRAMES = 8
+    MIN_SWING_FRAMES = 5
+    STILL_TIME_S = 3.0
+    DONE_COOLDOWN_S = 15.0
 
     def _get_club_proportional_speed(self, kps_2d, kps_3d):
         HOSEL_IDX = 18
-        if kps_3d is not None and self.prev_kps_3d is not None:
-            kps_now, kps_prev = np.array(kps_3d), np.array(self.prev_kps_3d)
-        elif self.prev_kps_2d is not None:
-            kps_now, kps_prev = np.array(kps_2d), np.array(self.prev_kps_2d)
-        else:
+        if self.prev_kps_2d is None:
             return 0.0
+        kps_now = np.array(kps_2d)
+        kps_prev = np.array(self.prev_kps_2d)
         club_disp = np.linalg.norm(kps_now[HOSEL_IDX] - kps_prev[HOSEL_IDX])
         torso_len = np.linalg.norm(kps_now[9] - kps_now[0])
         if torso_len < 1e-6:
@@ -336,15 +338,22 @@ class GolfInferenceEngine:
         return club_disp / torso_len
 
     def _update_swing_state(self, club_prop, stats):
+        now = time.time()
+
         if self.swing_state == "idle":
             if club_prop < self.STILL_THRESH:
-                self.still_count += 1
-                if self.still_count >= self.STILL_FRAMES_NEEDED:
+                if self._still_start is None:
+                    self._still_start = now
+                elapsed = now - self._still_start
+                stats["timer"] = round(max(self.STILL_TIME_S - elapsed, 0), 1)
+                if elapsed >= self.STILL_TIME_S:
                     self.swing_state = "ready"
                     self.swing_summary = None
+                    self._still_start = None
                     print("🏌️ Posición inicial detectada — Listo para swing")
             else:
-                self.still_count = 0
+                self._still_start = None
+                stats["timer"] = round(self.STILL_TIME_S, 1)
 
         elif self.swing_state == "ready":
             if club_prop >= self.SWING_THRESH:
@@ -358,20 +367,25 @@ class GolfInferenceEngine:
             if club_prop < self.STILL_THRESH:
                 self.cool_count += 1
                 if self.cool_count >= self.COOL_FRAMES_NEEDED:
-                    self._finalize_swing()
-                    self.swing_state = "done"
-                    self.still_count = 0
+                    if len(self.swing_frames) >= self.MIN_SWING_FRAMES:
+                        self._finalize_swing()
+                        self.swing_state = "done"
+                        self._done_time = now
+                    else:
+                        print(f"⏭️ Movimiento descartado — solo {len(self.swing_frames)} frames (mínimo {self.MIN_SWING_FRAMES})")
+                        self.swing_state = "ready"
+                        self.swing_frames = []
+                        self.cool_count = 0
             else:
                 self.cool_count = 0
 
         elif self.swing_state == "done":
-            if club_prop < self.STILL_THRESH:
-                self.still_count += 1
-                if self.still_count >= self.DONE_HOLD_FRAMES:
-                    self.swing_state = "idle"
-                    self.still_count = 0
-            else:
-                self.still_count = 0
+            remaining = self.DONE_COOLDOWN_S - (now - self._done_time)
+            stats["timer"] = round(max(remaining, 0), 1)
+            if remaining <= 0:
+                self.swing_state = "idle"
+                self._still_start = None
+                print("🔄 Cooldown terminado — Listo para otro swing")
 
     _SWING_KEYS = [
         "right_knee_angle", "left_knee_angle",

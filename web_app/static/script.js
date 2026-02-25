@@ -334,22 +334,32 @@ function updateSwingState(stats) {
     const st = stats.swing_state;
     let activeFlow = 0;
 
+    const timer = stats.timer;
+
     if (st === 'idle') {
         dot.className = 'swing-dot idle';
-        text.textContent = 'Ponte de pie con el palo y quédate quieto';
+        if (timer !== undefined && timer < 3) {
+            text.textContent = 'Quédate quieto... ' + timer.toFixed(1) + 's';
+        } else {
+            text.textContent = 'Ponte de pie con el palo y quédate quieto';
+        }
         activeFlow = 1;
     } else if (st === 'ready') {
         dot.className = 'swing-dot ready';
         text.textContent = '¡Listo! Haz tu swing cuando quieras';
-        if (result) result.classList.add('hidden');
         activeFlow = 2;
     } else if (st === 'active') {
         dot.className = 'swing-dot active';
         text.textContent = 'Grabando swing...';
+        if (result) result.classList.add('hidden');
         activeFlow = 3;
     } else if (st === 'done') {
         dot.className = 'swing-dot done';
-        text.textContent = '¡Swing analizado!';
+        if (timer !== undefined && timer > 0) {
+            text.textContent = '¡Swing analizado! Siguiente en ' + Math.ceil(timer) + 's';
+        } else {
+            text.textContent = '¡Swing analizado!';
+        }
         if (stats.swing_summary) showSwingSummary(stats.swing_summary);
         activeFlow = 5;
     }
