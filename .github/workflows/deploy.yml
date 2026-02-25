@@ -28,11 +28,10 @@ jobs:
       - name: Download Models from S3
         run: |
           mkdir -p entrenamiento_kaggle/work_dirs
-          echo "Sincronizando modelos desde S3 Express (excluyendo logs pesados)..."
-          # Sincronizamos solo archivos esenciales, ignorando las carpetas de entrenamiento temporales (que pesan GBs)
-          aws s3 sync s3://golfpose-gpu-kaggel--use1-az4--x-s3/work_dirs/ entrenamiento_kaggle/work_dirs/ \
-            --exclude "*/202*/*" \
-            --delete
+          echo "Descargando modelos desde S3 Express (Directory Bucket)..."
+          # S3 Express One Zone no soporta 'sync', usamos 'cp' recursivo.
+          # Excluimos las carpetas de logs con fechas (*/202*/*) para evitar descargar GBs de datos innecesarios.
+          aws s3 cp s3://golfpose-gpu-kaggel--use1-az4--x-s3/work_dirs/ entrenamiento_kaggle/work_dirs/ --recursive --exclude "*/202*/*"
 
           echo "Verificación de archivos descargados:"
           ls -R entrenamiento_kaggle/work_dirs/
