@@ -15,3 +15,6 @@ node_modules
 venv
 env
 .env
+
+# Permitimos los modelos para que GitHub Actions pueda meterlos en la imagen
+# entrenamiento_kaggle/work_dirs/  <-- Comentado para que Docker SÍ los vea
